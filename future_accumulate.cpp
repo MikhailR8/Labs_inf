@@ -3,24 +3,26 @@
 #include <future>
 #include <numeric>
 #include <chrono>
+#include <fstream>
 
 const size_t BORDER_SIZE = 1000u;
 using steady_clock = std::chrono::steady_clock;
 
 class Timer {
 public:
-    Timer() : start(steady_clock::now()) {}
+    Timer(std::fstream& w) : start(steady_clock::now()), writer(w) {}
     ~Timer() {
-        std::cout << std::chrono::duration_cast<std::chrono::microseconds>(steady_clock::now() - start).count()
+        writer << std::chrono::duration_cast<std::chrono::microseconds>(steady_clock::now()
+            - start).count()
             << std::endl;
     }
 private:
     steady_clock::time_point start;
+    std::fstream& writer;
 };
 
 template <typename Iterator, typename T>
-T future_accumulate(Iterator begin, Iterator end, T init, 
-    int count_threads = std::thread::hardware_concurrency()) {
+T future_accumulate(Iterator begin, Iterator end, T init, int count_threads) {
     auto size = std::distance(begin, end);
     auto num_threads = count_threads;
     std::vector<std::future<T>> threads;
@@ -44,13 +46,15 @@ T future_accumulate(Iterator begin, Iterator end, T init,
 }
 
 int main() {
-    std::vector<long double> numbers(1000000000);
+    std::vector<long double> numbers(1'000'000'000);
     std::iota(numbers.begin(), numbers.end(), 1);
+    std::fstream out("result.txt", std::ios_base::app);
     for (auto i = 1; i < std::thread::hardware_concurrency(); i++) {
         {
-            Timer t;
+            Timer t(out);
             future_accumulate(numbers.begin(), numbers.end(), 0.l, i);
         }
     }
+    out.close();
     return 0;
 }
